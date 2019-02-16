@@ -31,19 +31,23 @@ import android.view.MenuItem;
 class MainActivity : AppCompatActivity(),MediaPlayerControl{
     private lateinit var  controller: MusicController
     private var musicSrv: MusicService = MusicService();
-    private lateinit var  playIntent: Intent
+    private   var  playIntent: Intent? = null
     private var musicBound = false
+     var songList: ArrayList<Song> =  ArrayList<Song>()
+   lateinit var songView:ListView
      var paused = false
     var playbackPaused = false
     override fun isPlaying(): Boolean {
-        return musicSrv.isPng();    }
+        if(musicSrv!=null && musicBound==true ){
+        return musicSrv.isPng();    }else return false}
 
     override fun canSeekForward(): Boolean {
         return true
     }
 
     override fun getDuration(): Int {
-        return musicSrv.getDur();
+        if(musicSrv!=null && musicBound==true && (musicSrv.isPng())){
+        return musicSrv.getDur();}else return 0
     }
     override fun onPause() {
         super.onPause();
@@ -62,19 +66,21 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
         super.onStop()
     }
 
+
     override fun pause() {
         playbackPaused=true;
         musicSrv.pausePlayer();    }
 
     override fun getBufferPercentage(): Int {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return 0;
     }
 
     override fun seekTo(pos: Int) {
         musicSrv.seek(pos);    }
 
     override fun getCurrentPosition(): Int {
-        return musicSrv.getPosn();
+        if(musicSrv!=null && musicBound==true && (musicSrv.isPng())){
+        return musicSrv.getPosn();}else return 0;
     }
 
     override fun canSeekBackward(): Boolean {
@@ -91,15 +97,18 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
     override fun canPause(): Boolean {
         return true    }
 
-    private fun setController() {
+     fun setController() {
         //set the controller up
-        controller = MusicController(this)
+        controller = MusicController(this@MainActivity)
         controller.setPrevNextListeners(
             { playNext() },
             { playPrev() })
         controller.setMediaPlayer(this);
         controller.setAnchorView(findViewById(R.id.song_list));
         controller.setEnabled(true);
+
+
+
     }
 
     private fun playNext() {
@@ -111,6 +120,10 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
         controller.show(0)
     }
 
+    override fun onDestroy() {
+        stopService(playIntent)
+        super.onDestroy()
+    }
     private fun playPrev() {
         musicSrv.playPrev()
         if (playbackPaused) {
@@ -120,13 +133,16 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
         controller.show(0)
     }
 
-
+    fun songPicked(view: View) {
+        musicSrv.setSong(Integer.parseInt(view.tag.toString()))
+        musicSrv.playSong()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         //Arreglo de canciones y un list view
-        var songList: ArrayList<Song> =  ArrayList<Song>()
-        var songView:ListView
+
+
         songView= findViewById(R.id.song_list)
 
         fun getSongLing(){
@@ -154,6 +170,7 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
                     songList.add(Song(thisId, thisTitle, thisArtist))
                 } while (musicCursor.moveToNext())
             }
+
         }
 
         getSongLing()
@@ -164,5 +181,30 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
             songList
         ) { a, b -> a.getTitle().compareTo(b.getTitle()) }
         setController()
+
+    }
+    //connect to the service
+    val musicConnection = object : ServiceConnection {
+
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            val binder = service as MusicBinder
+            //get service
+            musicSrv = binder.getService()
+            //pass list
+            musicSrv!!.setList(songList)
+            musicBound = true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            musicBound = false
+        }
+    }
+    override fun onStart() {
+        super.onStart()
+        if (playIntent == null) {
+            playIntent = Intent(this, MusicService::class.java)
+            bindService(playIntent, musicConnection, Context.BIND_AUTO_CREATE)
+            startService(playIntent)
+        }
     }
 }
