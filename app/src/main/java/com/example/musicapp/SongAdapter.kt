@@ -12,7 +12,7 @@ import android.widget.LinearLayout
 
 
 
-
+//Nuestro song adapter para mostrar nombre de la cancion y demas.
 
 class SongAdapter(c:Context, mySongs:ArrayList<Song>): BaseAdapter() {
     private val songs: ArrayList<Song> = mySongs

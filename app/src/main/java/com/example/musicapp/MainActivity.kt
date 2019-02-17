@@ -25,15 +25,19 @@ import android.content.Context;
 import com.example.musicapp.MusicService.MusicBinder;
 
 import android.content.ServiceConnection;
+import android.util.Log
 import android.view.MenuItem;
-
-
+import kotlin.math.log
+//Silvio Orozco 18282
+//Main Activity ejecucion principal del programa
 class MainActivity : AppCompatActivity(),MediaPlayerControl{
+    //Variables para utilizar nuestro reproductor
     private lateinit var  controller: MusicController
     private var musicSrv: MusicService = MusicService();
     private   var  playIntent: Intent? = null
     private var musicBound = false
      var songList: ArrayList<Song> =  ArrayList<Song>()
+    lateinit var  songAdt:SongAdapter
    lateinit var songView:ListView
      var paused = false
     var playbackPaused = false
@@ -55,6 +59,7 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
 
     override fun onResume() {
         super.onResume()
+
         if (paused) {
             setController()
             paused = false
@@ -62,7 +67,8 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
     }
 
     override fun onStop() {
-        controller.hide()
+
+
         super.onStop()
     }
 
@@ -99,13 +105,16 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
 
      fun setController() {
         //set the controller up
-        controller = MusicController(this@MainActivity)
+
         controller.setPrevNextListeners(
             { playNext() },
             { playPrev() })
+
         controller.setMediaPlayer(this);
         controller.setAnchorView(findViewById(R.id.song_list));
         controller.setEnabled(true);
+        controller.show()
+
 
 
 
@@ -135,53 +144,13 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
 
     fun songPicked(view: View) {
         musicSrv.setSong(Integer.parseInt(view.tag.toString()))
-        musicSrv.playSong()
-    }
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        //Arreglo de canciones y un list view
-
-
-        songView= findViewById(R.id.song_list)
-
-        fun getSongLing(){
-            //Acceder a las canciones
-            val musicResolver = contentResolver
-
-            val musicUri = android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-            val READ_STORAGE_PERMISSION_REQUEST_CODE =1;
-            ActivityCompat.requestPermissions(
-                this as Activity, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                READ_STORAGE_PERMISSION_REQUEST_CODE
-            )
-
-            val musicCursor = musicResolver.query(musicUri, null, null, null, null)
-            if (musicCursor != null && musicCursor.moveToFirst()) {
-                //get columns
-                val titleColumn = musicCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE)
-                val idColumn = musicCursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID)
-                val artistColumn = musicCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.ARTIST)
-                //add songs to list
-                do {
-                    val thisId = musicCursor.getLong(idColumn)
-                    val thisTitle = musicCursor.getString(titleColumn)
-                    val thisArtist = musicCursor.getString(artistColumn)
-                    songList.add(Song(thisId, thisTitle, thisArtist))
-                } while (musicCursor.moveToNext())
-            }
-
+        val READ_STORAGE_PERMISSION_REQUEST_CODE =1;
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            musicSrv.playSong()
         }
 
-        getSongLing()
-
-        val songAdt = SongAdapter(this, songList)
-        songView.adapter = songAdt
-        Collections.sort(
-            songList
-        ) { a, b -> a.getTitle().compareTo(b.getTitle()) }
         setController()
-
     }
     //connect to the service
     val musicConnection = object : ServiceConnection {
@@ -207,4 +176,86 @@ class MainActivity : AppCompatActivity(),MediaPlayerControl{
             startService(playIntent)
         }
     }
+    fun requestPermission(){
+        val READ_STORAGE_PERMISSION_REQUEST_CODE =1;
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this as Activity, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                READ_STORAGE_PERMISSION_REQUEST_CODE
+            )
+
+
+
+
+
+
+        }
+
+
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if(requestCode==1){
+            if(grantResults[0]==PackageManager.PERMISSION_GRANTED){
+                getSongLing()
+                songAdt.notifyDataSetChanged()
+                Log.v("Me","songlist")
+
+            }
+        }
+
+    }
+    fun getSongLing(){
+        //Acceder a las canciones Contest Resolver
+        val musicResolver = contentResolver
+
+
+
+
+
+            val musicUri = android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            val musicCursor = musicResolver.query(musicUri, null, null, null, null)
+            if (musicCursor != null && musicCursor.moveToFirst()) {
+                //get columns
+                val titleColumn = musicCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE)
+                val idColumn = musicCursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID)
+                val artistColumn = musicCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.ARTIST)
+                //add songs to list
+                do {
+                    val thisId = musicCursor.getLong(idColumn)
+                    val thisTitle = musicCursor.getString(titleColumn)
+                    val thisArtist = musicCursor.getString(artistColumn)
+                    songList.add(Song(thisId, thisTitle, thisArtist))
+                } while (musicCursor.moveToNext())
+
+            }
+
+    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        //Arreglo de canciones y un list view
+
+        controller = MusicController(this@MainActivity)
+        songView= findViewById(R.id.song_list)
+
+
+
+         songAdt = SongAdapter(this, songList)
+        songView.adapter = songAdt
+
+        requestPermission()
+        if(ContextCompat.checkSelfPermission(this,
+                Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED){
+            getSongLing()
+            Log.v("", "Permission is granted");
+            songAdt.notifyDataSetChanged()
+        }
+        Collections.sort(
+            songList
+        ) { a, b -> a.getTitle().compareTo(b.getTitle()) }
+
+    }
+
 }

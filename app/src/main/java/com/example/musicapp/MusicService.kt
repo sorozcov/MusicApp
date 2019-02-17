@@ -1,6 +1,8 @@
 package com.example.musicapp
 
 
+import android.Manifest
+import android.app.Activity
 import android.app.Service
 import android.content.Intent
 import android.media.AudioManager
@@ -13,6 +15,9 @@ import android.app.Notification;
 import android.app.PendingIntent;
 
 import android.content.ContentUris
+import android.content.pm.PackageManager
+import android.support.v4.app.ActivityCompat
+import android.support.v4.content.ContextCompat
 import android.util.Log
 
 
@@ -24,7 +29,7 @@ import android.util.Log
 
 
 
-
+//Servicio de Musica para poder reproducir, cambiar etc. Nuestro player.
 class MusicService: Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErrorListener,
     MediaPlayer.OnCompletionListener {
     private val musicBind: IBinder = MusicBinder();
@@ -33,9 +38,9 @@ class MusicService: Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErr
     private var songPosn: Int = 0
     private  var songTitle:String="";
     private val NOTIFY_ID:Int =1;
-    override fun onPrepared(mp: MediaPlayer?) {
+    override fun onPrepared(mp: MediaPlayer) {
         //start playback
-        mp!!.start();
+        mp.start();
         val notIntent = Intent(this, MainActivity::class.java)
         notIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pendInt = PendingIntent.getActivity(
@@ -63,14 +68,14 @@ class MusicService: Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErr
         player.release()
         return false
     }
-    override fun onError(mp: MediaPlayer?, what: Int, extra: Int): Boolean {
-        mp!!.reset();
+    override fun onError(mp: MediaPlayer, what: Int, extra: Int): Boolean {
+        mp.reset();
         return false;
     }
 
-    override fun onCompletion(mp: MediaPlayer?) {
+    override fun onCompletion(mp: MediaPlayer) {
         if(player.getCurrentPosition()>0){
-            mp!!.reset();
+            mp.reset();
             playNext();
         }
     }
@@ -102,23 +107,29 @@ class MusicService: Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErr
         }
     }
     fun playSong(){
+
+
         player.reset();
-        //get song
-        val playSong = songs[songPosn]
+            //get song
+            val playSong = songs[songPosn]
 //get id
-        val currSong = playSong.getID()
+            val currSong = playSong.getID()
 //set uri
-        val trackUri = ContentUris.withAppendedId(
-            android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            currSong
-        )
-        try {
-            player.setDataSource(applicationContext, trackUri)
-        } catch (e: Exception) {
-            Log.e("MUSIC SERVICE", "Error setting data source", e)
-        }
-        player.prepareAsync();
-        songTitle=playSong.getTitle();
+
+            val trackUri = ContentUris.withAppendedId(
+                android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                currSong
+            )
+            try {
+                player.setDataSource(applicationContext, trackUri)
+            } catch (e: Exception) {
+                Log.e("MUSIC SERVICE", "Error setting data source", e)
+            }
+            player.prepareAsync();
+
+            songTitle = playSong.getTitle();
+
+
     }
 
     fun setSong(songIndex: Int) {
@@ -133,6 +144,7 @@ class MusicService: Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErr
 
     fun getDur(): Int {
         return player.duration
+
     }
 
     fun isPng(): Boolean {
@@ -141,10 +153,27 @@ class MusicService: Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErr
 
     fun pausePlayer() {
         player.pause()
+
     }
 
     fun seek(posn: Int) {
-        player.seekTo(posn)
+        if(posn>songPosn){
+            songPosn++
+            if(songPosn==songs.size) {
+                songPosn=0
+            }
+            playSong();
+
+
+        }else{
+            songPosn = songPosn-1
+            if(songPosn==-1) {
+                songPosn = songs.size - 1;
+            }
+            playSong();
+
+        }
+
     }
 
     fun go() {
@@ -152,14 +181,13 @@ class MusicService: Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErr
     }
 
     fun playPrev(){
-        songPosn--
-        if(songPosn<0){ songPosn=songs.size-1;}
+        songPosn=0;
         playSong();
     }
     fun playNext(){
-        songPosn++
-        if(songPosn==songs.size){ songPosn=0;}
+        songPosn=songs.size-1
         playSong();
     }
+
 
 }
